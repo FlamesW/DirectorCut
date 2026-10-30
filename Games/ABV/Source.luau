@@ -7,7 +7,7 @@ if typeof(_IsLoadedFM) == "function" and _IsLoadedFM() then return warn("[FLAMES
 local os_clock, loadstring, tostring, match, warn = os.clock, loadstring, tostring, match, warn
 local write_file, read_file, is_file, make_folder, is_folder = writefile, readfile, isfile, makefolder, isfolder
 
-local getgenv = getgenv or function()
+local Director = getgenv() or function()
     return shared
 end
 
@@ -69,8 +69,8 @@ local Script = Load_FM().Launch({})
 
 local ReplicatedStorage = Script.ReplicatedStorage 
 local SpawnedTools = Workspace:FindFirstChild("SpawnedTools")
+local StandFarmToggle
 
---[[
 local StandMappings = {
     [1] = "Standless",
     [2] = "Star Platinum (SP)",
@@ -225,7 +225,6 @@ local StandMappings = {
     [8888] = "Sans",
     [1111] = "Gun Fiend"
 }
---]]
 
 local ItemsPriority = {
     ["time leaper's clock"] = 21,
@@ -245,11 +244,26 @@ local ItemsPriority = {
     ["dio's diary"] = 7,
     ["frost sword"] = 6,
     ["requiem arrow"] = 5,
-    ["pot"] = 4,
-    ["banknote"] = 3,
-    ["rokakaka fruit"] = 2,
-    ["stand arrow"] = 1,
+    ["banknote"] = 4,
+    ["rokakaka fruit"] = 3,
+    ["stand arrow"] = 2,
+    ["pot"] = 1,
 }
+
+local function Clean(str)
+    return string.lower(str):gsub("[^%w]", "")
+end
+
+local function GetScore(s1, s2)
+    local Count = 0
+    local MinLen = math.min(#s1, #s2)
+    for i = 1, MinLen do
+        if string.sub(s1, i, i) == string.sub(s2, i, i) then
+            Count = Count + 1
+        end
+    end
+    return Count
+end
 
 function Script:GetItemPriority(Name)
     local N = (Name or ""):lower()
@@ -333,7 +347,7 @@ function Script:Attack(State)
 
         if NearestHumanoid and NearestCFrame then
             for _, Variant in ipairs(Variants) do
-                ReplicatedStorage:WaitForChild("Damage"):FireServer(
+                ReplicatedStorage.Damage:FireServer(
                     NearestHumanoid,
                     NearestCFrame,
                     Variant,
@@ -558,18 +572,123 @@ function Script:EquipBanknotes(State)
     return true
 end
 
+function Script:FindStand(Table)
+    local StandValue = self.LocalPlayer.Data.Stand.Value
+    local CurrentStandName, isWanted = StandMappings[StandValue] or "Unknown", false
+
+    for Selected, isTrue in pairs(Table) do
+        if isTrue then
+            local CleanSelected = Clean(Selected)
+            local BestMatching, HighestScore = nil, -1
+            
+            for Num, Mapped in pairs(StandMappings) do
+                local CleanMapped = Clean(Mapped)
+                local Score = GetScore(CleanSelected, CleanMapped)
+                
+                if Score > HighestScore then
+                    HighestScore = Score; BestMatching = Num
+                end
+            end
+
+            if BestMatching == StandValue then
+                isWanted = true
+                break
+            end
+        end
+    end
+
+    return isWanted, CurrentStandName
+end
+
+function Script:StandFarm(State)
+    if not State then
+        self:ForceStop("@StandFarm")
+        self.StandFarming = false
+        return false
+    end
+
+    if self.StandFarming then return true end
+    self.StandFarming = true
+
+    self:SmartLoop(0.35, function(self)
+        if not self.StandFarming then return end
+
+        if self.Is_BossFarming then return end
+
+        if not self.SelectedStands or next(self.SelectedStands) == nil then return end
+        local IsWanted, CurrentStandName = self:FindStand(self.SelectedStands)
+
+        if CurrentStandName and (CurrentStandName:lower():find("standless") or CurrentStandName == "Unknown") then
+            self:UseArrow()
+        else
+            if IsWanted then
+                Library:Notify(CurrentStandName, 15)
+
+                if StandFarmToggle then
+                    StandFarmToggle:Set(false)
+                end
+                return
+            else
+                self:UseRokakaka()
+            end
+        end
+    end, "@StandFarm")
+    
+    return true
+end
+
+function Script:UseArrow()
+    if self._UsingItem then return end
+    
+    local Arrow = self:FindTool("Stand Arrow")
+    
+    if Arrow then
+        self._UsingItem = true
+
+        self:EquipTool(Arrow.Name)
+        ReplicatedStorage.Arrow:FireServer()
+
+        task.wait(0.45)
+        self._UsingItem = false
+    else
+        if Script.AutoBuyItems then
+            ReplicatedStorage.BuyArrow:FireServer()
+        end
+    end
+end
+
+function Script:UseRokakaka()
+    if self._UsingItem then return end
+    
+    local Rokakaka = self:FindTool("Rokakaka Fruit")
+    
+    if Rokakaka then
+        self._UsingItem = true
+
+        self:EquipTool(Rokakaka.Name)
+        ReplicatedStorage.Roka:FireServer()
+
+        task.wait(0.45)
+        self._UsingItem = false
+    else
+        if Script.AutoBuyItems then
+            ReplicatedStorage.BuyRoka:FireServer()
+        end
+    end
+end
+
 -- // @Library.luau
-getgenv().Game, Main_Folder = "A Bizarre Village", "FLAMES";
-local Library, Flags = Script:Load_DirectorCut({ Cache = Main_Folder .. "/Storage/Library.luau" })
+Director.Game, Main_Folder = "A Bizarre Village", "FLAMES";
+Director.Library, Director.Flags = Script:Load_DirectorCut({ Cache = Main_Folder .. "/Storage/Library.luau" })
 
 local Window = Library:CreateWindow({
     Title = 'FLAMES  |  <font color="rgb(60, 200, 100)">Director\'s Cut</font>',
     Blur = true,
     NotifySound = 4590657391,
     NotifyVolume = 2,
-    SaveFolder = getgenv().Multi_Support
-        and (Main_Folder .. "/" .. tostring(getgenv().Game) .. "/Configurations")
-        or (Main_Folder .. "/" .. tostring(getgenv().Game) .. "/" .. Library.LocalPlayer.Name),
+    SaveFolder = Director.Multi_Support
+        and (Main_Folder .. "/" .. tostring(Director.Game) .. "/Configurations")
+        or (Main_Folder .. "/" .. tostring(Director.Game) .. "/" .. Library.LocalPlayer.Name),
     Icon = "129855843582244",
     ToggleKeybind = Enum.KeyCode.V,
 })
@@ -578,7 +697,7 @@ Script:AntiAFK()
 Script:SetCameraOcclusion("Invisicam")
 
 Library.OnUnload = function()
-    Script:SetCameraOcclusion("Zoom") Script:Unload()
+    Script:SetCameraOcclusion("Zoom"); Script:Unload()
 end
 
 local MainTab = Window:AddTab("Main","file-code-corner", true)
@@ -636,6 +755,51 @@ Farming:AddToggle({
     end,
 })
 
+local StandsDropdown = Farming:AddDropdown({
+    Name = "Stand", Flag = "Stand_Selection",
+    Multi = true,
+    Searchable = true,
+    AllowNull = false,
+    Values = {
+        "Hierophant Green",
+        "Crazy Diamond",
+        "The Hand",
+        "Silver Chariot",
+        "Gold Experience",
+        "Anubis",
+        "Killer Queen",
+        "The World: High Voltage",
+        "King Crimson",
+        "The World",
+        "Star Platinum",
+        "Whitesnake",
+        "The Hand: Triple T",
+        "Crazy Diamond: Steve",
+        "Shiny Gold Experience",
+        "The World: Retro",
+        "Star Platinum: Retro",
+    },
+    Callback = function(Value)
+        Script.SelectedStands = Value
+    end,
+})
+StandsDropdown:SetValue({ ["Hierophant Green"] = true })
+
+StandFarmToggle = Farming:AddToggle({
+    Name = "Stand Farm", Flag = "Stand_Farm", Value = false,
+    Callback = function(Value)
+        Script:StandFarm(Value)
+    end,
+})
+
+Farming:AddToggle({
+    Name = "Auto Buy Items", Flag = "Auto_Buy_Items",
+    Value = false,
+    Callback = function(Value)
+        Script.AutoBuyItems = Value
+    end,
+})
+
 local PlayerTab = Window:AddTab("Player", "file-user")
 
 local State = {
@@ -646,9 +810,7 @@ local State = {
 local Movement = PlayerTab:AddElementSection("• Movement", true)
 
 Movement:AddToggle({
-    Name = "Super WalkSpeed",
-    Flag = "Super_WS",
-    Value = false,
+    Name = "Super WalkSpeed", Flag = "Super_WS", Value = false,
     Callback = function(Value)
         State.SuperWS = Value
 
@@ -665,8 +827,7 @@ Movement:AddToggle({
 })
 
 Movement:AddSlider({
-    Name = "WalkSpeed Value",
-    Flag = "Super_WS_Value",
+    Name = "WalkSpeed Value", Flag = "Super_WS_Value",
     Min = 16, Max = 500, Increment = 1, Value = 100,
     Callback = function(Value)
         State.WS_Value = Value
@@ -676,9 +837,7 @@ Movement:AddSlider({
 Movement:AddDivider()
 
 Movement:AddToggle({
-    Name = "Super Jump",
-    Flag = "Super_JP",
-    Value = false,
+    Name = "Super Jump", Flag = "Super_JP", Value = false,
     Callback = function(Value)
         State.SuperJP = Value
 
@@ -695,8 +854,7 @@ Movement:AddToggle({
 })
 
 Movement:AddSlider({
-    Name = "JumpPower Value",
-    Flag = "Super_JP_Value",
+    Name = "JumpPower Value", Flag = "Super_JP_Value",
     Min = 50, Max = 500, Increment = 1, Value = 100,
     Callback = function(Value)
         State.JP_Value = Value
@@ -706,9 +864,7 @@ Movement:AddSlider({
 Movement:AddDivider()
 
 Movement:AddToggle({
-    Name = "Flight",
-    Flag = "Flight",
-    Value = false,
+    Name = "Flight", Flag = "Flight", Value = false,
     Callback = function(Value)
         State.Flight = Value
         if Value then
@@ -720,8 +876,7 @@ Movement:AddToggle({
 })
 
 Movement:AddSlider({
-    Name = "Flight Speed",
-    Flag = "Flight_Speed",
+    Name = "Flight Speed", Flag = "Flight_Speed",
     Min = 10, Max = 500, Increment = 1, Value = 50,
     Callback = function(Value)
         State.FlightSpd = Value
@@ -734,9 +889,7 @@ Movement:AddSlider({
 Movement:AddDivider()
 
 Movement:AddToggle({
-    Name = "Noclip",
-    Flag = "Noclip",
-    Value = false,
+    Name = "Noclip", Flag = "Noclip", Value = false,
     Callback = function(Value)
         if Value then
             if not Script._NoclipLoop then
@@ -757,18 +910,14 @@ Movement:AddToggle({
 local Visuals = PlayerTab:AddElementSection("• Visuals", true)
 
 Visuals:AddToggle({
-    Name = "XRay",
-    Flag = "XRay",
-    Value = false,
+    Name = "XRay", Flag = "XRay", Value = false,
     Callback = function(Value)
         Script:XRay(Value)
     end,
 })
 
 Visuals:AddToggle({
-    Name = "3D Rendering",
-    Flag = "3D_Rendering",
-    Value = false,
+    Name = "3D Rendering", Flag = "3D_Rendering", Value = false,
     Callback = function(Value)
         Script:Set3DRendering(Value)
     end,
@@ -778,6 +927,6 @@ local SettingsTab = Window:AddTab("Settings", "file-cog")
 Window:BuildSettingsElement(SettingsTab)
 
 Library:Notify("Good " .. Script:GetTimeOfDay() .. " " .. Library.LocalPlayer.DisplayName, 5)
-Library:Notify("Detected: " .. getgenv().Game, 10)
+Library:Notify("Detected: " .. Director.Game, 10)
 
 Library:LoadAutoloadConfig()
