@@ -461,9 +461,10 @@ function Script:BossFarm(State)
 
         for i = 1, #GetClasses do
             local Model = GetClasses[i]
-
             if Model == Char then continue end
-            if Model.Name:lower():find("dum") then continue end
+
+            local N = Model.Name:lower()
+            if N:find("dum") or N:find("corrupt") then continue end
 
             local IsNPC = self:IsNPC(Model)
             if not IsNPC then continue end
