@@ -419,9 +419,8 @@ function Script:ItemFarm(State)
         end
     end, "@ItemFarm", false, function(self)
         local Root = self:GetRoot()
-        if Root then
-            Root.CFrame = Root.CFrame + Vector3.new(0, 12, 0)
-        end
+        Root.CFrame = Root.CFrame + Vector3.new(0, 12, 0)
+
         self:StopFling() self:StopClip()
     end)
 
