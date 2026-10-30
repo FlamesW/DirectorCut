@@ -421,7 +421,7 @@ function Script:ItemFarm(State)
         local Root = self:GetRoot()
         Root.CFrame = Root.CFrame + Vector3.new(0, 12, 0)
 
-        self:StopFling() self:StopClip()
+        self:StopFling(); self:StopClip()
     end)
 
     return true
@@ -482,7 +482,58 @@ function Script:BossFarm(State)
         local Root = self:GetRoot()
         Root.CFrame = Root.CFrame + Vector3.new(0, 16, 0)
 
-        self:StopFling() self:StopClip()
+        self:StopFling(); self:StopClip()
+    end)
+
+    return true
+end
+
+function Script:AutoBlock(State)
+    if not State then
+        self:ForceStop("@AutoBlock")
+        return false
+    end
+
+    if self.AutoBlocking then return true end
+    self.AutoBlocking = true
+
+    local BlockEvent, DodgeEvent = ReplicatedStorage.Block, ReplicatedStorage.Dodge
+
+    self:SmartLoop(0.1, function()
+        if not self.AutoBlocking then return end
+
+        DodgeEvent:FireServer(); BlockEvent:FireServer(true)
+    end, "@AutoBlock", false, function(self)
+        self.AutoBlocking = false
+
+        BlockEvent:FireServer(false)
+    end)
+
+    return true
+end
+
+function Script:GodExperience(State)
+    if not State then
+        self:ForceStop("@GodExperience")
+        return false
+    end
+
+    if self.GE_GodMode then return true end
+    self.GE_GodMode = true
+
+    local Deflect = ReplicatedStorage.DeflectFrog
+
+    self:SmartLoop(0.35, function()
+        if not self.GE_GodMode then return end
+
+        Deflect:FireServer(true)
+    end, "@GodExperience", false, function(self)
+        self.GE_GodMode = false
+
+        for i = 1, 25 do
+            Deflect:FireServer(false)
+            task.wait(0.075)
+        end
     end)
 
     return true
@@ -540,6 +591,22 @@ Combat:AddToggle({
     Value = false,
     Callback = function(Value) 
         Script:Attack(Value)
+    end,
+})
+
+Combat:AddToggle({
+    Name = "Auto Block", Flag = "Auto_Block", 
+    Value = false,
+    Callback = function(Value) 
+        Script:AutoBlock(Value)
+    end,
+})
+
+Combat:AddToggle({
+    Name = "Gold Experience | GOD", Flag = "GE_GOD", 
+    Value = false,
+    Callback = function(Value) 
+        Script:GodExperience(Value)
     end,
 })
 
@@ -687,9 +754,9 @@ Movement:AddToggle({
     end,
 })
 
-local PlayerVisuals = PlayerTab:AddElementSection("• Visuals", true)
+local Visuals = PlayerTab:AddElementSection("• Visuals", true)
 
-PlayerVisuals:AddToggle({
+Visuals:AddToggle({
     Name = "XRay",
     Flag = "XRay",
     Value = false,
@@ -698,7 +765,7 @@ PlayerVisuals:AddToggle({
     end,
 })
 
-PlayerVisuals:AddToggle({
+Visuals:AddToggle({
     Name = "3D Rendering",
     Flag = "3D_Rendering",
     Value = false,
