@@ -251,6 +251,40 @@ local ItemsPriority = {
     ["stand arrow"] = 1,
 }
 
+function Script:GetItemPriority(Name)
+    local N = (Name or ""):lower()
+    for Key, Prio in pairs(ItemsPriority) do
+        if N:find(Key, 1, true) then
+            return Prio
+        end
+    end
+    return 22
+end
+
+function Script:HighValueItem(MinPriority)
+    MinPriority = MinPriority or 4
+
+    local Root = self:GetRoot()
+    if not Root or not SpawnedTools then return false end
+
+    for _, Tool in ipairs(SpawnedTools:GetChildren()) do
+        local FakeHandle = Tool:FindFirstChild("FakeHandle")
+        if not FakeHandle then continue end
+
+        local Part = Tool:FindFirstChildWhichIsA("BasePart")
+            or FakeHandle:FindFirstChildWhichIsA("BasePart")
+        if not Part then continue end
+        if (Part.Position - Root.Position).Magnitude > 4000 then continue end
+
+        local P = self:GetItemPriority(Tool.Name)
+        if P >= MinPriority then
+            return true
+        end
+    end
+
+    return false
+end
+
 function Script:Attack(State)
     if not State then
         self.KillAura = false
@@ -326,25 +360,15 @@ function Script:ItemFarm(State)
     if self.ItemFarming then return true end
     self.ItemFarming = true
 
-    self:SmartLoop(0.000015, function(self)
+    self:SmartLoop(0.0000015, function(self)
+        if not self.ItemFarming then return end
+
         local Root = self:GetRoot()
         if not Root then return end
 
-        if self.Is_BossFarming then return end
-
         task.spawn(function()
-            self:Noclip() self:AntiFling() 
+            self:Noclip() self:AntiFling()
         end)
-
-        local function GetPriority(Name)
-            local N = Name:lower()
-            for key, prio in pairs(ItemsPriority) do
-                if N:find(key, 1, true) then
-                    return prio
-                end
-            end
-            return 22
-        end
 
         local Priority, Best = -1, nil
 
@@ -353,11 +377,12 @@ function Script:ItemFarm(State)
 
             local Part = Tool:FindFirstChildWhichIsA("BasePart")
                 or Tool.FakeHandle:FindFirstChildWhichIsA("BasePart")
-
             if not Part then continue end
             if (Part.Position - Root.Position).Magnitude > 4000 then continue end
 
-            local P = GetPriority(Tool.Name)
+            local P = self:GetItemPriority(Tool.Name)
+            if self.Is_BossFarming and P < 4 then continue end
+
             if P > Priority then
                 Priority = P
                 Best = Tool
@@ -394,8 +419,9 @@ function Script:ItemFarm(State)
         end
     end, "@ItemFarm", false, function(self)
         local Root = self:GetRoot()
-        Root.CFrame = Root.CFrame + Vector3.new(0, 12, 0)
-
+        if Root then
+            Root.CFrame = Root.CFrame + Vector3.new(0, 12, 0)
+        end
         self:StopFling() self:StopClip()
     end)
 
@@ -412,8 +438,13 @@ function Script:BossFarm(State)
     if self.BossFarming then return true end
     self.BossFarming = true
 
-    self:SmartLoop(0.000015, function(self)
+    self:SmartLoop(0.0000015, function(self)
         if not self.BossFarming then return end
+
+        if self.ItemFarming and self:HighValueItem(4) then
+            self.Is_BossFarming = false
+            return
+        end
 
         local Root = self:GetRoot()
         if not Root then return end
@@ -540,7 +571,7 @@ Farming:AddToggle({
 
 local PlayerTab = Window:AddTab("Player", "file-user")
 
-local States = {
+local State = {
     SuperWS = false, SuperJP = false, Flight = false,
     WS_Value = 100, JP_Value = 100, FlightSpd = 50,
 }
@@ -552,12 +583,12 @@ Movement:AddToggle({
     Flag = "Super_WS",
     Value = false,
     Callback = function(Value)
-        States.SuperWS = Value
+        State.SuperWS = Value
 
         if Value then
             Script:SmartLoop(0.1, function()
                 local Hum = Script:GetHumanoid()
-                if Hum then Hum.WalkSpeed = States.WS_Value end
+                if Hum then Hum.WalkSpeed = State.WS_Value end
             end, "@SuperWS")
         else
             Script:ForceStop("@SuperWS")
@@ -571,7 +602,7 @@ Movement:AddSlider({
     Flag = "Super_WS_Value",
     Min = 16, Max = 500, Increment = 1, Value = 100,
     Callback = function(Value)
-        States.WS_Value = Value
+        State.WS_Value = Value
     end,
 })
 
@@ -582,12 +613,12 @@ Movement:AddToggle({
     Flag = "Super_JP",
     Value = false,
     Callback = function(Value)
-        States.SuperJP = Value
+        State.SuperJP = Value
 
         if Value then
             Script:SmartLoop(0.1, function()
                 local Hum = Script:GetHumanoid()
-                if Hum then Hum.JumpPower = States.JP_Value end
+                if Hum then Hum.JumpPower = State.JP_Value end
             end, "@SuperJP")
         else
             Script:ForceStop("@SuperJP")
@@ -601,7 +632,7 @@ Movement:AddSlider({
     Flag = "Super_JP_Value",
     Min = 50, Max = 500, Increment = 1, Value = 100,
     Callback = function(Value)
-        States.JP_Value = Value
+        State.JP_Value = Value
     end,
 })
 
@@ -612,9 +643,9 @@ Movement:AddToggle({
     Flag = "Flight",
     Value = false,
     Callback = function(Value)
-        States.Flight = Value
+        State.Flight = Value
         if Value then
-            Script:Flight(true, States.FlightSpd)
+            Script:Flight(true, State.FlightSpd)
         else
             Script:Flight(false)
         end
@@ -626,7 +657,7 @@ Movement:AddSlider({
     Flag = "Flight_Speed",
     Min = 10, Max = 500, Increment = 1, Value = 50,
     Callback = function(Value)
-        States.FlightSpd = Value
+        State.FlightSpd = Value
         if Script:IsFlightActive() then
             Script:SetFlightSpeed(Value)
         end
@@ -656,9 +687,9 @@ Movement:AddToggle({
     end,
 })
 
-local Visuals = PlayerTab:AddElementSection("• Visuals", true)
+local PlayerVisuals = PlayerTab:AddElementSection("• Visuals", true)
 
-Visuals:AddToggle({
+PlayerVisuals:AddToggle({
     Name = "XRay",
     Flag = "XRay",
     Value = false,
@@ -667,7 +698,7 @@ Visuals:AddToggle({
     end,
 })
 
-Visuals:AddToggle({
+PlayerVisuals:AddToggle({
     Name = "3D Rendering",
     Flag = "3D_Rendering",
     Value = false,
