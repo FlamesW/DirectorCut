@@ -276,7 +276,7 @@ function Script:GetItemPriority(Name)
 end
 
 function Script:HighValueItem(MinPriority)
-    MinPriority = MinPriority or 4
+    MinPriority = MinPriority or 5
 
     local Root = self:GetRoot()
     if not Root or not SpawnedTools then return false end
@@ -454,7 +454,7 @@ function Script:BossFarm(State)
     self:SmartLoop(0.0000015, function(self)
         if not self.BossFarming then return end
 
-        if self.ItemFarming and self:HighValueItem(4) then
+        if self.ItemFarming and self:HighValueItem(5) then
             self.Is_BossFarming = false
             return
         end
@@ -684,8 +684,8 @@ Director.Library, Director.Flags = Script:Load_DirectorCut({ Cache = Main_Folder
 local Window = Library:CreateWindow({
     Title = 'FLAMES  |  <font color="rgb(60, 200, 100)">Director\'s Cut</font>',
     Blur = true,
-    NotifySound = 4590657391,
-    NotifyVolume = 2,
+
+    Theme = "Default",
     SaveFolder = Director.Multi_Support
         and (Main_Folder .. "/" .. tostring(Director.Game) .. "/Configurations")
         or (Main_Folder .. "/" .. tostring(Director.Game) .. "/" .. Library.LocalPlayer.Name),
@@ -779,11 +779,11 @@ local StandsDropdown = Farming:AddDropdown({
         "The World: Retro",
         "Star Platinum: Retro",
     },
+    Default = 1,
     Callback = function(Value)
         Script.SelectedStands = Value
     end,
 })
-StandsDropdown:SetValue({ ["Hierophant Green"] = true })
 
 StandFarmToggle = Farming:AddToggle({
     Name = "Stand Farm", Flag = "Stand_Farm", Value = false,
